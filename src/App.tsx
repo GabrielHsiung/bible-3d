@@ -10,6 +10,8 @@ import { NPCs } from './components/NPCs'
 import { HUD } from './components/HUD'
 import { EnvProbes, Effects, PathTrace } from './components/Render'
 import * as THREE from 'three'
+import { Atmosphere } from './experience/Atmosphere'
+import { AudioDriver, QualityManager } from './experience/Runtime'
 
 const NO_FX = new URLSearchParams(location.search).has('nofx')
 
@@ -37,7 +39,8 @@ export default function App() {
     <div
       className="stage"
       onPointerDown={(e) => {
-        if ((e.target as HTMLElement).closest('.ui') || useStore.getState().photo) return
+        const st = useStore.getState()
+        if ((e.target as HTMLElement).closest('.ui') || st.photo || st.phase !== 'play') return
         drag.current = { id: e.pointerId, x: e.clientX, y: e.clientY }
         ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
       }}
@@ -48,13 +51,14 @@ export default function App() {
         input.pitch = Math.min(1.25, Math.max(-0.15, input.pitch + (e.clientY - d.y) * 0.004))
         d.x = e.clientX
         d.y = e.clientY
+        input.lastLook = performance.now()
       }}
       onPointerUp={() => (drag.current = null)}
       onPointerCancel={() => (drag.current = null)}
     >
       <Canvas
         shadows
-        dpr={[1, 1.75]}
+        dpr={[1, useStore.getState().quality === 'high' ? 1.75 : 1.25]}
         gl={{ toneMapping: THREE.NoToneMapping, preserveDrawingBuffer: true, antialias: false }}
         camera={{ fov: 50, near: 0.1, far: 6000, position: [35, 4, 0] }}
       >
@@ -69,6 +73,9 @@ export default function App() {
           </Physics>
           <NPCs key={'npc' + cubit} C={C} />
           <EnvProbes key={'env' + cubit} C={C} />
+          {!NO_FX && <Atmosphere C={C} />}
+          <AudioDriver C={C} />
+          <QualityManager />
           {photo ? <PathTrace /> : !NO_FX && <Effects />}
         </Suspense>
       </Canvas>

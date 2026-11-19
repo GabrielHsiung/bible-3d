@@ -1,25 +1,39 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { Sky } from '@react-three/drei'
 import { CuboidCollider, RigidBody } from '@react-three/rapier'
 import * as THREE from 'three'
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { goatMaps, sandMaps } from '../pbr'
 import { mulberry } from '../rng'
+import { useStore } from '../store'
 
 /** 上午的陽光：從東南方斜照（約 28° 仰角），會幕入口朝東，正面受光 */
 export const SUN = new THREE.Vector3(0.78, 0.47, 0.41).normalize().multiplyScalar(120)
 const isTouch = typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches
 
 export function Lights() {
+  const quality = useStore((s) => s.quality)
+  const sun = useRef<THREE.DirectionalLight>(null)
+  const mapSize = quality === 'high' ? (isTouch ? 2048 : 4096) : quality === 'medium' ? 2048 : 1024
+  // 品質改變時重建陰影貼圖
+  useEffect(() => {
+    const s = sun.current
+    if (!s) return
+    s.shadow.mapSize.set(mapSize, mapSize)
+    s.shadow.map?.dispose()
+    ;(s.shadow as { map: THREE.WebGLRenderTarget | null }).map = null
+  }, [mapSize])
   return (
     <>
       <Sky distance={3000} sunPosition={SUN.toArray()} turbidity={2.6} rayleigh={2.4} mieCoefficient={0.003} mieDirectionalG={0.86} />
       <hemisphereLight args={['#bcd3f2', '#9b7a52', 0.45]} />
       <directionalLight
+        ref={sun}
         position={SUN.toArray()}
         intensity={3.2}
         color="#ffe9cc"
         castShadow
-        shadow-mapSize={isTouch ? [2048, 2048] : [4096, 4096]}
+        shadow-mapSize={[mapSize, mapSize]}
         shadow-bias={-0.0003}
         shadow-normalBias={0.03}
         shadow-camera-left={-45}
@@ -165,24 +179,38 @@ function tentGeometry() {
   return g
 }
 
+/** 營地帳棚的位置（Atmosphere 的炊煙也用這份資料） */
+export function campTents(C: number) {
+  const rnd = mulberry(42)
+  const out: { x: number; z: number; s: number; r: number; dark: boolean }[] = []
+  let tries = 0
+  while (out.length < 340 && tries < 9000) {
+    tries++
+    const x = (rnd() - 0.5) * 420
+    const z = (rnd() - 0.5) * 380
+    if (Math.abs(x) < 50 * C + 22 && Math.abs(z) < 25 * C + 22) continue
+    if (x > 0 && Math.abs(z) < 9) continue
+    if (out.some((t) => (t.x - x) ** 2 + (t.z - z) ** 2 < 70)) continue
+    out.push({ x, z, s: 2.4 + rnd() * 1.8, r: rnd() * Math.PI, dark: rnd() > 0.45 })
+  }
+  return out
+}
+
 /** 以色列營地：帳棚圍繞會幕（佈局參民數記 2 章，位置為推測） */
 export function Camp({ C }: { C: number }) {
-  const tents = useMemo(() => {
-    const rnd = mulberry(42)
-    const out: { x: number; z: number; s: number; r: number; dark: boolean }[] = []
-    let tries = 0
-    while (out.length < 340 && tries < 9000) {
-      tries++
-      const x = (rnd() - 0.5) * 420
-      const z = (rnd() - 0.5) * 380
-      if (Math.abs(x) < 50 * C + 22 && Math.abs(z) < 25 * C + 22) continue
-      if (x > 0 && Math.abs(z) < 9) continue
-      if (out.some((t) => (t.x - x) ** 2 + (t.z - z) ** 2 < 70)) continue
-      out.push({ x, z, s: 2.4 + rnd() * 1.8, r: rnd() * Math.PI, dark: rnd() > 0.45 })
+  const tents = useMemo(() => campTents(C), [C])
+  const merged = useMemo(() => {
+    const base = tentGeometry()
+    const m4 = new THREE.Matrix4()
+    const q = new THREE.Quaternion()
+    const up = new THREE.Vector3(0, 1, 0)
+    const parts = { dark: [] as THREE.BufferGeometry[], light: [] as THREE.BufferGeometry[] }
+    for (const t of tents) {
+      m4.compose(new THREE.Vector3(t.x, 0, t.z), q.setFromAxisAngle(up, t.r), new THREE.Vector3(t.s, 2.3, t.s))
+      parts[t.dark ? 'dark' : 'light'].push(base.clone().applyMatrix4(m4))
     }
-    return out
-  }, [C])
-  const geo = useMemo(tentGeometry, [])
+    return { dark: mergeGeometries(parts.dark)!, light: mergeGeometries(parts.light)! }
+  }, [tents])
   const goat = useMemo(() => new THREE.MeshStandardMaterial({ ...goatMaps([3, 2]), roughness: 1, side: THREE.DoubleSide }), [])
   const light = useMemo(() => new THREE.MeshStandardMaterial({ normalMap: goatMaps([3, 2]).normalMap, color: '#a08a6a', roughness: 1, side: THREE.DoubleSide }), [])
   return (
@@ -192,9 +220,9 @@ export function Camp({ C }: { C: number }) {
           <CuboidCollider key={i} args={[t.s, 1, t.s * 0.8]} position={[t.x, 1, t.z]} rotation={[0, t.r, 0]} />
         ))}
       </RigidBody>
-      {tents.map((t, i) => (
-        <mesh key={i} geometry={geo} material={t.dark ? goat : light} position={[t.x, 0, t.z]} rotation={[0, t.r, 0]} scale={[t.s, 2.3, t.s]} castShadow receiveShadow />
-      ))}
+      {/* 340 頂帳棚合併成兩個網格（深色／淺色），省下幾百個 draw call */}
+      <mesh geometry={merged.dark} material={goat} castShadow receiveShadow />
+      <mesh geometry={merged.light} material={light} castShadow receiveShadow />
     </group>
   )
 }

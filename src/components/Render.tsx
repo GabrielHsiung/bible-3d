@@ -1,11 +1,11 @@
 import { useEffect, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
-import { Bloom, BrightnessContrast, EffectComposer, HueSaturation, N8AO, ToneMapping, Vignette } from '@react-three/postprocessing'
-import { ToneMappingMode } from 'postprocessing'
+import { Bloom, BrightnessContrast, DepthOfField, EffectComposer, HueSaturation, N8AO, ToneMapping, Vignette } from '@react-three/postprocessing'
+import { ToneMappingMode, type DepthOfFieldEffect } from 'postprocessing'
 import { GradientEquirectTexture, WebGLPathTracer } from 'three-gpu-pathtracer'
 import * as THREE from 'three'
 import { INTERIOR } from '../materials'
-import { useStore } from '../store'
+import { useStore, view } from '../store'
 
 const isTouch = typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches
 
@@ -62,18 +62,45 @@ export function EnvProbes({ C }: { C: number }) {
   return null
 }
 
-/** 即時畫面的後製：環境光遮蔽、泛光、AgX 色調映射、調色 */
+/**
+ * 即時畫面的後製：環境光遮蔽、泛光、AgX 色調映射、調色。
+ * 依品質分級：low 不做 AO、不做景深；景深只在開場與導覽時打開。
+ */
 export function Effects() {
+  const quality = useStore((s) => s.quality)
+  const phase = useStore((s) => s.phase)
+  const tour = useStore((s) => s.tour)
+  const wantDof = quality !== 'low' && (phase !== 'play' || tour >= 0)
   return (
-    <EffectComposer multisampling={isTouch ? 0 : 4}>
-      <N8AO halfRes={isTouch} quality={isTouch ? 'performance' : 'medium'} aoRadius={1.6} distanceFalloff={0.6} intensity={2.4} color="#2a1c10" />
+    <EffectComposer multisampling={quality === 'high' && !isTouch ? 4 : 0}>
+      {quality !== 'low' ? (
+        <N8AO halfRes={quality !== 'high'} quality={quality === 'high' ? 'medium' : 'performance'} aoRadius={1.6} distanceFalloff={0.6} intensity={2.4} color="#2a1c10" />
+      ) : (
+        <></>
+      )}
+      {wantDof ? <Focus /> : <></>}
       <Bloom mipmapBlur luminanceThreshold={1.0} luminanceSmoothing={0.2} intensity={0.7} />
       <ToneMapping mode={ToneMappingMode.AGX} />
       <HueSaturation saturation={0.12} />
       <BrightnessContrast contrast={0.1} brightness={0.0} />
-      <Vignette offset={0.35} darkness={0.35} />
+      <Vignette offset={0.35} darkness={phase === 'play' && tour < 0 ? 0.35 : 0.5} />
     </EffectComposer>
   )
+}
+
+/** 景深：對焦點與強度每幀由 Player 寫入 view */
+function Focus() {
+  const ref = useRef<DepthOfFieldEffect>(null)
+  const { camera } = useThree()
+  useFrame(() => {
+    const e = ref.current
+    if (!e || !e.target) return
+    e.target.set(view.focus.x, view.focus.y, view.focus.z)
+    const d = camera.position.distanceTo(e.target)
+    e.cocMaterial.worldFocusRange = Math.max(3, d * 0.9)
+    e.bokehScale = view.dof * 3.2
+  })
+  return <DepthOfField ref={ref} target={[0, 0, 0]} worldFocusRange={8} bokehScale={0} resolutionScale={0.5} />
 }
 
 /**
