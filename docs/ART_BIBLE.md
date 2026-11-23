@@ -29,3 +29,8 @@ three.js 程序生成的寫實希臘世界），但我們必須**即時可玩**�
 - 目標：中階手機 30fps、電腦 60fps。總三角形數 < 1.5M；draw call < 600（重複物件用 InstancedMesh 或合併幾何）。
 - 不載入外部檔案（網址會被擋）；所有幾何、貼圖、聲音都在程式碼中產生。
 - 單檔輸出（`SINGLE=1 npx vite build --outDir dist-single`）必須能跑。
+
+## 外部參考（準確度）
+- **以色列博物館「第二聖殿末期耶路撒冷模型」（Holyland Model）**：1:50，約 2,000 平方公尺，Michael Avi-Yonah 依約瑟夫等史料設計（1962–1966），呈現約主後 66 年的城市；1974 年後由 Yoram Tsafrir 依考古成果修訂，2006 年遷至以色列博物館。用途：希律聖殿（H）、耶路撒冷時間軸的主後 30／66 年（F-3）、第 9、11 章的城市佈局。注意：部分內容（如賽馬場）已因考古未證實而移除，屬「傳統文獻／重建推測」等級。來源：https://en.wikipedia.org/wiki/Holyland_Model_of_Jerusalem
+- **Lithodomos VR**：第一世紀耶路撒冷 VR 重建，資料來自考古發掘、遺址圖、材質照片、GIS 與 NASA ASTER 高程模型。用途：地形與城市尺度的參照。
+- **threejs-game-skills**（MIT，/home/claude/ref/threejs-game-skills）：只當參考文件閱讀，特別是 `skills/threejs-aaa-graphics-builder/references/visual-scorecard.md`（10 項畫面評分）與 `skills/threejs-game-ui-designer/references/ui-patterns.md`。其中需要 Tripo／ElevenLabs／Gemini 金鑰的生成流程本專案不使用。
