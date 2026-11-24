@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { CUBITS, type CubitKey } from './data/tabernacle'
+import { bootSave } from './game/save'
 
 /** 體驗流程：開場空拍 → 進場運鏡 → 玩家操控 */
 export type Phase = 'intro' | 'flying' | 'play'
@@ -13,7 +14,9 @@ const isTouch = typeof window !== 'undefined' && window.matchMedia('(pointer: co
 const forcedQ = qs.get('q') as Quality | null
 /** 網址加 ?q=high|medium|low 可鎖定品質（不自動調整） */
 export const QUALITY_LOCKED = forcedQ === 'high' || forcedQ === 'medium' || forcedQ === 'low'
-const initialQ: Quality = QUALITY_LOCKED ? forcedQ! : isTouch ? 'medium' : 'high'
+const savedQ = bootSave.settings.quality
+/** 畫質：網址參數 > 存檔的手動設定 > 自動（手機從 medium 開始） */
+const initialQ: Quality = QUALITY_LOCKED ? forcedQ! : savedQ !== 'auto' ? savedQ : isTouch ? 'medium' : 'high'
 
 interface State {
   cubit: CubitKey
@@ -49,7 +52,7 @@ interface State {
 }
 
 export const useStore = create<State>((set) => ({
-  cubit: 'common',
+  cubit: bootSave.settings.cubit,
   cutaway: false,
   nearId: null,
   panelOpen: false,

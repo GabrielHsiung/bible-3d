@@ -2,7 +2,10 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { CONFIDENCE_LABEL, CUBITS, ITEMS, fmtRefs, verses, type Item } from '../data/tabernacle'
 import { input, useStore, type Zone } from '../store'
 import { audio } from '../audio'
+import { startAudio } from '../audio/ui'
 import { TOUR } from '../experience/tour'
+import { useShell, CH1_TOTAL } from '../game/shell'
+import type { ModeId } from '../game/scenes'
 
 const isTouch = typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches
 
@@ -72,33 +75,6 @@ function IconButton({ label, onClick, on, children }: { label: string; onClick: 
       {children}
       <span className="tip">{label}</span>
     </button>
-  )
-}
-
-/* ---------------- 開場畫面 ---------------- */
-function Intro() {
-  const setPhase = useStore((s) => s.setPhase)
-  const muted = useStore((s) => s.muted)
-  const [leaving, setLeaving] = useState(false)
-  const start = () => {
-    // 必須在點擊事件裡啟動音訊
-    audio.start()
-    audio.setMuted(muted)
-    setLeaving(true)
-    setPhase('flying')
-  }
-  return (
-    <div className={`ui intro${leaving ? ' leaving' : ''}`}>
-      <div className="intro-inner">
-        <div className="intro-kicker">出埃及記 25–40 章・曠野中的聖所</div>
-        <h1 className="intro-title">會幕</h1>
-        <p className="intro-line">曠野的清晨，炊煙從營地升起。穿過東方的門，一步一步走近那至聖的所在。</p>
-        <button className="intro-start" onClick={start} disabled={leaving}>
-          開始體驗
-        </button>
-        <div className="intro-note">含音樂與環境音・建議戴上耳機</div>
-      </div>
-    </div>
   )
 }
 
@@ -314,6 +290,7 @@ function Joystick() {
       onPointerMove={(e) => id.current === e.pointerId && move(e.clientX, e.clientY)}
       onPointerUp={end}
       onPointerCancel={end}
+      onLostPointerCapture={end}
     >
       <div className="knob" style={{ transform: `translate(${knob.x}px, ${knob.y}px)` }} />
     </div>
@@ -369,8 +346,27 @@ function FadeCut() {
   return <div key={teleport.n} className="fadecut" />
 }
 
+/* ---------------- 章節目標（第 1 章） ---------------- */
+function Objective() {
+  const visited = useShell((s) => s.save.visited)
+  const done = useShell((s) => s.save.completed.includes(1))
+  const n = visited.filter((id) => ITEMS.some((i) => i.id === id)).length
+  return (
+    <div className="ui objective">
+      <div className="objective-k">第一章・地中央的帳幕</div>
+      <div className="objective-t">{done ? '已完成：你走遍了會幕中的一切' : `走近每一件器具，讀它的經文`}</div>
+      <div className="objective-bar">
+        <i style={{ width: `${(n / CH1_TOTAL) * 100}%` }} />
+      </div>
+      <div className="objective-n">
+        {n} / {CH1_TOTAL}
+      </div>
+    </div>
+  )
+}
+
 /* ---------------- 主 HUD ---------------- */
-export function HUD() {
+export function HUD({ mode = 'explore' }: { mode?: ModeId }) {
   const cubit = useStore((s) => s.cubit)
   const setCubit = useStore((s) => s.setCubit)
   const cutaway = useStore((s) => s.cutaway)
@@ -395,7 +391,7 @@ export function HUD() {
 
   const toggleSound = () => {
     if (!audio.started) {
-      audio.start()
+      startAudio()
       audio.setMuted(false)
       setMuted(false)
       return
@@ -404,22 +400,17 @@ export function HUD() {
     setMuted(!muted)
   }
 
-  // 鍵盤快捷鍵：M 靜音、Esc 關閉
+  // 鍵盤快捷鍵：M 靜音（Esc 由外框處理：關閉目錄／離開拍照／暫停）
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.code === 'KeyM') toggleSound()
-      if (e.code === 'Escape') {
-        const st = useStore.getState()
-        st.setIndex(false)
-        if (st.tour >= 0) st.setTour(-1)
-      }
+      if (e.code === 'KeyM' && !useShell.getState().paused) toggleSound()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   })
 
   if (photo) return <PhotoBar />
-  if (phase === 'intro') return <Intro />
+  if (phase === 'intro') return null
   return (
     <>
       <FadeCut />
@@ -445,14 +436,22 @@ export function HUD() {
                 肘<small>{(CUBITS[cubit].meters * 100).toFixed(1)}</small>
               </span>
             </IconButton>
-            <IconButton label="拍照（路徑追蹤）" onClick={() => setPhoto(true)}>
+            <IconButton label="拍照（路徑追蹤）" on={mode === 'photo'} onClick={() => setPhoto(true)}>
               {Icon.camera}
             </IconButton>
             <IconButton label={soundOn ? '靜音' : '開啟聲音'} on={!soundOn} onClick={toggleSound}>
               {soundOn ? Icon.sound : Icon.muted}
             </IconButton>
           </div>
-          {hint && tour < 0 && (
+          {mode === 'chapter' && tour < 0 && <Objective />}
+          {mode === 'photo' && hint && (
+            <div className="ui hint photo-hint" onClick={() => setHint(false)}>
+              攝影模式：走到想拍的位置、轉好角度，按右側的 <b>相機</b> 按鈕。
+              <br />
+              畫面會凍結並用路徑追蹤慢慢累積光線，取樣越多越清晰。
+            </div>
+          )}
+          {hint && tour < 0 && mode !== 'photo' && (
             <div className="ui hint" onClick={() => setHint(false)}>
               {isTouch ? '左下搖桿移動（推到底會跑）・滑動畫面轉視角' : 'WASD／方向鍵移動・Shift 奔跑・拖曳畫面轉視角・M 靜音'}
               <br />
