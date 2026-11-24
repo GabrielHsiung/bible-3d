@@ -1,0 +1,7 @@
+export { Altar } from './Altar'
+export { Laver } from './Laver'
+export { Table } from './Table'
+export { Lampstand } from './Lampstand'
+export { IncenseAltar } from './IncenseAltar'
+export { Ark } from './Ark'
+export { Embers, FireLight, Flames, LampFlame, Smoke } from './Flame'
