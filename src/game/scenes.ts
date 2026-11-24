@@ -68,6 +68,6 @@ export const SCENES: Record<SceneId, SceneDef> = {
     spawn: [0, 0],
     music: 'camp',
     building: !jerusalemLoader,
-    signalsReady: false,
+    signalsReady: true,
   },
 }
