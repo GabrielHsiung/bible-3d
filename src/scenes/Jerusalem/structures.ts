@@ -1,6 +1,10 @@
 /**
  * F-3 各時期的城市：每個建築群有存在的年代（spans）與結束方式（焚毀 burn／沉沒淡出 sink）。
  * 尺寸：聖殿用肘（一般肘 0.445 m）；其餘用公尺。外觀除註明者外皆屬重建推測。
+ * 希律時期（約主後 30／66）的整體佈局對照以色列博物館 1:50「第二聖殿末期耶路撒冷模型」
+ * （Avi-Yonah 依約瑟夫設計、Tsafrir 依考古修訂）：聖殿山梯形平台與四周柱廊、南邊皇家柱廊、
+ * 西北角安東尼亞堡、上城西北角的希律王宮與三塔（希皮庫斯、法撒勒、瑪利安）、上城（西山）與下城（大衛城）、
+ * 第一／二／三道牆。模型中的賽馬場已移除，這裡也不放。
  */
 import * as THREE from 'three'
 import { GB, along } from './builders'
@@ -84,8 +88,9 @@ function solomonTemple(plain: boolean): Parts {
   const s = get('stone')
   const y0 = groundY(0, 0) + 1.2
   const W = -c(22) // 西端（至聖所在岩石上）
-  // 高起的石台
-  s.box(c(18), y0 - 4, 0, c(110), 4, c(50), '#d6c7a6')
+  // 院子的石台（摩利亞山頂整平）
+  const court = rect(W - c(32), -c(57), W + c(142), c(57))
+  s.prism(court, minGround(court) - 2, y0 - 0.4, '#cdbd98')
   // 旁屋（三層，每層 5 肘，王上 6:5–10）：北、南、西三面
   s.box(W + c(30) - c(3), y0, 0, c(66), c(17), c(34), plain ? '#cdbd9a' : '#d9cba9')
   // 殿身
@@ -601,13 +606,13 @@ export const STRUCTURES: Structure[] = [
   { id: 'wall-medieval', spans: [[1033, 1219]], end: 'sink', build: ottomanWalls('#cdbb98', false) },
   { id: 'wall-ottoman', spans: [[1538, 9999]], end: 'sink', build: ottomanWalls('#e0d1ae', true) },
   // 聖殿山
-  { id: 'square', spans: [[-960, -586], [-516, -20]], end: 'sink', build: () => platform(SQUARE, SQ_TOP, '#d2c19c') },
+  { id: 'square', spans: [[-150, -20]], end: 'sink', build: () => platform(SQUARE, SQ_TOP, '#d2c19c') },
   { id: 'mount', spans: [[-20, 9999]], end: 'sink', build: herodMount },
   { id: 'temple-solomon', spans: [[-960, -586]], end: 'burn', smoke: [[0, 0]], build: () => solomonTemple(false) },
   { id: 'temple-zerubbabel', spans: [[-516, -20]], end: 'sink', build: zerubbabelTemple },
   { id: 'baris', spans: [[-150, -35]], end: 'sink', build: tower([-110, -195], 18 + SQ_TOP - groundY(-110, -195), 22) },
   { id: 'temple-herod', spans: [[-20, 70]], end: 'burn', smoke: [[20, 0], [80, 0]], build: herodTemple },
-  { id: 'porticoes', spans: [[-15, 70]], end: 'burn', smoke: [[0, 190], [160, 0]], build: herodPorticoes },
+  { id: 'porticoes', spans: [[-20, 70]], end: 'burn', smoke: [[0, 190], [160, 0]], build: herodPorticoes },
   { id: 'antonia', spans: [[-35, 70]], end: 'burn', smoke: [[-110, -295]], build: antonia },
   { id: 'temple-ruins-586', spans: [[-586, -516]], end: 'sink', delay: 2.8, build: rubble(586, [rect(-60, -40, 60, 40), WALL_DAVID], 400, true) },
   { id: 'temple-ruins-70', spans: [[70, 135]], end: 'sink', delay: 2.8, build: rubble(70, [rect(-80, -50, 150, 50), rect(-120, 150, 160, 215), WALL_FIRST], 900, true) },

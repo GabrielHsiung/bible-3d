@@ -211,11 +211,11 @@ export function slopeAt(x: number, z: number) {
 
 /* ---------- 顏色：石灰岩、紅土、乾草、梯田 ---------- */
 const C = {
-  lime: new THREE.Color('#cdb894'),
-  rock: new THREE.Color('#ddd3bf'),
+  lime: new THREE.Color('#b9a17a'),
+  rock: new THREE.Color('#cfc4ad'),
   rockDark: new THREE.Color('#a59a86'),
   soil: new THREE.Color('#9c6c47'),
-  grass: new THREE.Color('#9a9058'),
+  grass: new THREE.Color('#8b8049'),
   green: new THREE.Color('#6f7444'),
   dust: new THREE.Color('#d2c09d'),
 }

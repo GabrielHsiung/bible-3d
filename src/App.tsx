@@ -1,4 +1,4 @@
-import { Suspense, useEffect, useRef } from 'react'
+import { Suspense, lazy, useEffect, useRef } from 'react'
 import { Canvas } from '@react-three/fiber'
 import { Physics } from '@react-three/rapier'
 import { CUBITS } from './data/tabernacle'
@@ -14,8 +14,13 @@ import { Atmosphere } from './experience/Atmosphere'
 import { AudioDriver, QualityManager } from './experience/Runtime'
 
 const NO_FX = new URLSearchParams(location.search).has('nofx')
+// 獨立預覽：?scene=jerusalem 只渲染耶路撒冷時間軸（jerusalem agent）
+const JERUSALEM = new URLSearchParams(location.search).get('scene') === 'jerusalem'
+const Jerusalem = lazy(() => import('./scenes/Jerusalem'))
 
 export default function App() {
+  // 網址參數在整個頁面生命週期固定，提前 return 不會改變 hooks 的呼叫順序
+  if (JERUSALEM) return <Suspense fallback={null}><Jerusalem mode="overview" onExit={() => (location.search = '')} /></Suspense>
   const cubit = useStore((s) => s.cubit)
   const photo = useStore((s) => s.photo)
   const C = CUBITS[cubit].meters
