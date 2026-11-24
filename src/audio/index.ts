@@ -44,8 +44,13 @@ function build(ctx: BaseAudioContext) {
   revIn.connect(reverb).connect(revOut).connect(master)
 
   const music = new Music(ctx, master, revIn)
-  const amb = new Ambience(ctx, master, revIn)
-  return { master, analyser, music, amb }
+  // 環境音（風、營地、腳步、羊角號）走自己的匯流排，乾聲與殘響一起調整音量
+  const ambBus = ctx.createGain()
+  ambBus.connect(master)
+  const ambRev = ctx.createGain()
+  ambRev.connect(revIn)
+  const amb = new Ambience(ctx, ambBus, ambRev)
+  return { master, analyser, music, amb, ambBus, ambRev }
 }
 
 class AudioEngine {
@@ -56,6 +61,7 @@ class AudioEngine {
   private zone: Zone = 'camp'
   private C = 0.445
   private volume = 0.85
+  private mix = { music: 0.8, sfx: 0.8 }
 
   get started() {
     return !!this.ctx
@@ -79,6 +85,7 @@ class AudioEngine {
       return
     }
     const now = ctx.currentTime
+    this.applyMix(true)
     this.g.master.gain.setValueAtTime(0, now)
     this.g.master.gain.linearRampToValueAtTime(this.muted ? 0 : this.volume, now + 4)
     this.g.amb.setAltar({ x: 20 * this.C, y: 3 * this.C + 0.6, z: 0 })
@@ -107,6 +114,30 @@ class AudioEngine {
     this.g.master.gain.cancelScheduledValues(t)
     this.g.master.gain.setTargetAtTime(m ? 0 : this.volume, t, 0.25)
     if (!m) void this.ctx.resume()
+  }
+
+  /**
+   * 音樂與環境音效的音量（0–1，預設 0.8 = 原本的混音比例）。
+   * 音訊啟動前呼叫也可以，啟動時會套用。
+   */
+  setMix(music: number, sfx: number) {
+    this.mix = { music, sfx }
+    this.applyMix(false)
+  }
+
+  private applyMix(instant: boolean) {
+    if (!this.ctx || !this.g) return
+    const t = this.ctx.currentTime
+    const m = 0.9 * (this.mix.music / 0.8)
+    const a = this.mix.sfx / 0.8
+    for (const [p, v] of [
+      [this.g.music.out.gain, m],
+      [this.g.ambBus.gain, a],
+      [this.g.ambRev.gain, a],
+    ] as [AudioParam, number][]) {
+      if (instant) p.setValueAtTime(v, t)
+      else p.setTargetAtTime(v, t, 0.15)
+    }
   }
 
   /** 每幀呼叫 */

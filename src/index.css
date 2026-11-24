@@ -423,7 +423,9 @@ button.on { background: #7a4a1d; color: #fff8ec; }
   font-family: var(--serif); font-size: 15px; letter-spacing: 0.12em; color: rgba(244, 234, 216, 0.3); animation: menuin 1s var(--ease-slow) both;
 }
 .codex-tile.seen { color: #fffaf0; border-color: rgba(217, 184, 108, 0.35); }
-.codex-n { font-family: system-ui, sans-serif; font-size: 10px; letter-spacing: 0.3em; color: var(--gold); }
+.codex-n { width: 6px; height: 6px; margin-bottom: 4px; border: 1px solid rgba(217, 184, 108, 0.5); transform: rotate(45deg); }
+.codex-tile.seen .codex-n { background: var(--gold); border-color: var(--gold); }
+.ch-prog em, .objective-n, .ld-state { font-variant-numeric: tabular-nums; }
 
 /* ---------- 製作群 ---------- */
 .credits-list { display: grid; gap: 22px; max-width: 560px; overflow-y: auto; }
@@ -545,4 +547,12 @@ button.on { background: #7a4a1d; color: #fff8ec; }
 }
 @media (prefers-reduced-motion: reduce) {
   .menu li, .ch-card, .set-row, .boot *, .title-block, .chapter-card, .loading * { animation-duration: .01s !important; animation-delay: 0s !important; }
+}
+/* 設定列太多時可捲動，按鍵提示不壓在列上 */
+.settings .set-rows { flex: 0 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: rgba(217,184,108,.35) transparent; }
+@media (max-height: 560px) {
+  .set-row { min-height: 40px; }
+  .settings .menu-desc { margin-top: 10px; min-height: 0; }
+  .settings .keyhints, .chapters .keyhints { display: none; }
+  .settings .page-title { font-size: 30px; }
 }

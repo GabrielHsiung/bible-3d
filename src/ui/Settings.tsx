@@ -2,7 +2,7 @@
  * E-5 設定：畫質、音樂與音效音量、字幕大小、肘的標準、操作說明。
  * ↑↓ 選列、←→ 調整、Enter 開啟、Esc 返回；觸控直接點左右箭頭。
  */
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { CUBITS, type CubitKey } from '../data/tabernacle'
 import { useShell } from '../game/shell'
 import { storageOk, type CaptionSize, type QualityMode } from '../game/save'
@@ -118,6 +118,10 @@ export function SettingsPanel({ onBack, kicker }: { onBack: () => void; kicker?:
     view === 'list',
   )
 
+  useEffect(() => {
+    document.getElementById(`set-${i}`)?.scrollIntoView({ block: 'nearest' })
+  }, [i])
+
   if (view === 'controls') return <Controls onBack={() => setView('list')} />
   if (view === 'reset')
     return (
@@ -141,6 +145,7 @@ export function SettingsPanel({ onBack, kicker }: { onBack: () => void; kicker?:
           <div
             key={r.id}
             role="listitem"
+            id={`set-${k}`}
             className={`set-row${k === i ? ' focus' : ''}`}
             style={{ animationDelay: `${0.15 + k * 0.05}s` }}
             onPointerEnter={(e) => e.pointerType === 'mouse' && k !== i && (setI(k), ui.move())}

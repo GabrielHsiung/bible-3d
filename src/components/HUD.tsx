@@ -290,6 +290,7 @@ function Joystick() {
       onPointerMove={(e) => id.current === e.pointerId && move(e.clientX, e.clientY)}
       onPointerUp={end}
       onPointerCancel={end}
+      onLostPointerCapture={end}
     >
       <div className="knob" style={{ transform: `translate(${knob.x}px, ${knob.y}px)` }} />
     </div>

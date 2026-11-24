@@ -49,6 +49,9 @@ export function useMenuKeys(h: KeyHandlers, active = true) {
   }, [active])
 }
 
+/** 記住每個選單上次選到哪一項（返回時游標留在原處） */
+const FOCUS: Record<string, number> = {}
+
 export interface MenuItem {
   id: string
   label: string
@@ -61,8 +64,11 @@ export interface MenuItem {
 }
 
 /** 直式選單：選取中的項目變亮、左側一條細金線 */
-export function MenuList({ items, onBack, active = true, initial = 0, className = '' }: { items: MenuItem[]; onBack?: () => void; active?: boolean; initial?: number; className?: string }) {
-  const [i, setI] = useState(() => Math.min(initial, items.length - 1))
+export function MenuList({ items, onBack, active = true, initial = 0, className = '', memo }: { items: MenuItem[]; onBack?: () => void; active?: boolean; initial?: number; className?: string; memo?: string }) {
+  const [i, setI] = useState(() => Math.min(memo ? (FOCUS[memo] ?? initial) : initial, items.length - 1))
+  useEffect(() => {
+    if (memo) FOCUS[memo] = i
+  }, [memo, i])
   const move = (d: number) => {
     setI((v) => (v + d + items.length) % items.length)
     ui.move()

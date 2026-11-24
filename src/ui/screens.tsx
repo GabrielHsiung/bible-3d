@@ -135,7 +135,7 @@ export function MainMenu() {
           <small>會幕・聖殿・耶路撒冷</small>
         </span>
       </div>
-      <MenuList items={items} onBack={() => go('title')} />
+      <MenuList items={items} onBack={() => go('title')} memo="main" />
       <KeyHints>↑↓ 選擇　Enter 確認　Esc 返回</KeyHints>
     </section>
   )
@@ -167,11 +167,24 @@ export function Chapters() {
       return n
     })
   }
+  // 上下：跳到上一幕／下一幕的同一欄（每一幕的章數不同）
+  const mvAct = (d: number) => {
+    if (cols === 1) return mv(d)
+    setI((v) => {
+      const c = CHAPTERS[v]
+      const row = CHAPTERS.filter((x) => x.act === c.act)
+      const col = row.indexOf(c)
+      const next = CHAPTERS.filter((x) => x.act === c.act + d)
+      if (!next.length) return v
+      ui.move()
+      return CHAPTERS.indexOf(next[Math.min(col, next.length - 1)])
+    })
+  }
   useMenuKeys({
     left: () => mv(-1),
     right: () => mv(1),
-    up: () => mv(-cols),
-    down: () => mv(cols),
+    up: () => mvAct(-1),
+    down: () => mvAct(1),
     enter: () => choose(i),
     back: () => (ui.back(), go('menu')),
   })
@@ -262,7 +275,7 @@ export function Modes() {
   return (
     <section className="page modes">
       <PageHead kicker="遊戲" title="模式" onBack={() => go('menu')} />
-      <MenuList items={items} onBack={() => go('menu')} />
+      <MenuList items={items} onBack={() => go('menu')} memo="modes" />
       <KeyHints>↑↓ 選擇　Enter 確認　Esc 返回</KeyHints>
     </section>
   )
@@ -285,7 +298,7 @@ export function Codex() {
           const seen = visited.includes(it.id)
           return (
             <div key={it.id} className={`codex-tile${seen ? ' seen' : ''}`} style={{ animationDelay: `${0.1 + k * 0.03}s` }}>
-              <span className="codex-n">{String(k + 1).padStart(2, '0')}</span>
+              <span className="codex-n" aria-hidden />
               {seen ? it.name : '未發現'}
             </div>
           )
