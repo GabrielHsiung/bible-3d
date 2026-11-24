@@ -73,7 +73,7 @@ export function buildAltar() {
   // 四角的角：向上、向外彎（27:2）
   for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
     const out = new THREE.Vector3(sx, 0, sz)
-    const g = horn(0.85, 0.2, out, 0.6)
+    const g = horn(1.05, 0.22, out, 0.7)
     bronze.push(g.translate((sx * (W - 0.46)) / 2, H - 0.02, (sz * (W - 0.46)) / 2))
     bronze.push(rbox(0.5, 0.12, 0.5, 0.05).translate((sx * (W - 0.46)) / 2, H, (sz * (W - 0.46)) / 2))
   }

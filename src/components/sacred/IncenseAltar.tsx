@@ -67,7 +67,7 @@ export function IncenseAltar({ m }: { m: M }) {
         <mesh geometry={geo.gold} material={sacredMat.gold} castShadow receiveShadow />
         <mesh geometry={geo.coal} material={sacredMat.incenseCoals} />
         {/* 細細的一縷香煙 */}
-        <Smoke count={90} spread={0.04} height={4.5} size={0.26} speed={0.04} swirl={0.2} opacity={0.16} color="#ece6dc" warm="#d9c8b4" position={[0, HT, 0]} />
+        <Smoke count={160} spread={0.025} height={4.5} size={0.2} speed={0.035} swirl={0.14} opacity={0.12} color="#ece6dc" warm="#d9c8b4" position={[0, HT, 0]} />
         <FireLight position={[0, HT + 0.15, 0]} color="#ff7a30" intensity={0.5} distance={2.5} decay={2} />
       </group>
     </group>
