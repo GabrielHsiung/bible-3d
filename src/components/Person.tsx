@@ -1,118 +1,146 @@
-import { useRef, type MutableRefObject } from 'react'
+import { useEffect, useMemo, useRef, type MutableRefObject } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
+import { B, boneDefs, buildPerson } from './people/body'
+import { MAT_GOLD, MAT_SKIN, makeSkeleton } from './people/geo'
+import { animate, newAnim, type Action } from './people/anim'
+import { peopleMaterials } from './people/materials'
+import { staff, waterJar, woodBundle } from './people/props'
+import { makeParams, STYLES, type PersonStyle } from './people/styles'
 
-export interface PersonStyle {
-  robe: string
-  sash: string
-  head: string // 頭巾顏色
-  skin?: string
-  turban?: boolean // 祭司的細麻頭巾
-  beard?: boolean
+export { STYLES, type PersonStyle }
+export type { Action }
+export type Carry = null | 'wood' | 'jar' | 'staff'
+
+export interface PersonProps {
+  style: PersonStyle
+  /** 移動速度（公尺／秒），驅動走路動畫 */
+  speedRef: MutableRefObject<number>
+  /** 外觀隨機種子（體型、膚色、鬍子、衣服色差） */
+  seed?: number
+  /** 目前的動作（預設：依速度自動 idle／walk） */
+  actionRef?: MutableRefObject<Action>
+  /** 手上／頭上拿的東西 */
+  carryRef?: MutableRefObject<Carry>
+  /** 細節：auto = 依與相機距離切換 */
+  detail?: 'auto' | 'high' | 'low'
 }
 
-/** 簡易人物（約 1.65 公尺），以 speedRef 驅動走路動畫 */
-export function Person({ style, speedRef }: { style: PersonStyle; speedRef: MutableRefObject<number> }) {
-  const body = useRef<THREE.Group>(null)
-  const armL = useRef<THREE.Group>(null)
-  const armR = useRef<THREE.Group>(null)
-  const legL = useRef<THREE.Mesh>(null)
-  const legR = useRef<THREE.Mesh>(null)
-  const phase = useRef(Math.random() * 10)
-  const skin = style.skin ?? '#b07a52'
+const REF_H = 1.72
+const LOD_DIST = 28
+const tmpV = new THREE.Vector3()
+const tmpQ = new THREE.Quaternion()
+const tmpQ2 = new THREE.Quaternion()
 
-  useFrame((_, dt) => {
-    const v = speedRef.current
-    phase.current += dt * (3 + v * 2.6)
-    const a = Math.min(v / 2, 1)
-    const s = Math.sin(phase.current)
-    if (armL.current) armL.current.rotation.x = s * 0.7 * a
-    if (armR.current) armR.current.rotation.x = -s * 0.7 * a
-    if (legL.current) legL.current.position.z = s * 0.16 * a
-    if (legR.current) legR.current.position.z = -s * 0.16 * a
-    if (body.current) body.current.position.y = Math.abs(Math.cos(phase.current)) * 0.04 * a
+function hashStyle(s: PersonStyle) {
+  let h = 7
+  for (const ch of JSON.stringify(s)) h = (h * 31 + ch.charCodeAt(0)) | 0
+  return Math.abs(h) % 1000
+}
+
+/**
+ * 程序建模的寫實人物（蒙皮骨架、約 1.05–1.77 公尺）。
+ * 以 speedRef 驅動走路；actionRef 可指定彎腰、洗手、坐、跪、提水罐等動作。
+ */
+export function Person({ style, speedRef, seed, actionRef, carryRef, detail = 'auto' }: PersonProps) {
+  const sd = seed ?? hashStyle(style)
+  const built = useMemo(() => {
+    const { params, height } = makeParams(style, sd)
+    const mats = peopleMaterials()
+    const matOf = (m: number) => (m === MAT_SKIN ? mats.skin : m === MAT_GOLD ? mats.gold : mats.cloth)
+    const { bones, skeleton, rest } = makeSkeleton(boneDefs(params))
+    const group = new THREE.Group()
+    group.scale.setScalar(height / REF_H)
+    group.add(bones[0])
+    const bind = new THREE.Matrix4()
+    const sphere = new THREE.Sphere(new THREE.Vector3(0, 0.85, 0), 1.25)
+    const make = (d: number) => {
+      const out: THREE.SkinnedMesh[] = []
+      for (const [m, g] of buildPerson(params, d)) {
+        const mesh = new THREE.SkinnedMesh(g, matOf(m))
+        mesh.bind(skeleton, bind)
+        mesh.castShadow = true
+        mesh.receiveShadow = true
+        mesh.boundingSphere = sphere.clone()
+        group.add(mesh)
+        out.push(mesh)
+      }
+      return out
+    }
+    const hi = detail === 'low' ? [] : make(1)
+    const lo = detail === 'high' ? [] : make(0.5)
+    hi.forEach((m) => (m.visible = true))
+    lo.forEach((m) => (m.visible = detail === 'low'))
+    // 道具：掛在骨骼上，保持直立
+    const prop = (geo: THREE.BufferGeometry, mat: THREE.Material, bone: number) => {
+      const o = new THREE.Mesh(geo, mat)
+      o.castShadow = true
+      o.visible = false
+      bones[bone].add(o)
+      return o
+    }
+    const props = {
+      wood: prop(woodBundle(), mats.wood, B.CHEST),
+      jar: prop(waterJar(), mats.clay, B.HEAD),
+      staff: prop(staff(), mats.wood, B.HAND_R),
+    }
+    const anim = newAnim(sd, params.elder, params.child)
+    return { group, bones, rest, skeleton, hi, lo, props, anim, scale: height / REF_H }
+  }, [style, sd, detail])
+
+  useEffect(
+    () => () => {
+      for (const m of [...built.hi, ...built.lo]) m.geometry.dispose()
+      built.skeleton.dispose()
+    },
+    [built],
+  )
+
+  const lodState = useRef(detail === 'low')
+  useFrame((state, rawDt) => {
+    const dt = Math.min(rawDt, 0.05)
+    const b = built
+    const speed = speedRef.current
+    const action: Action = actionRef ? actionRef.current : 'idle'
+    animate(b.anim, b.bones, b.rest, action, speed, dt, b.scale)
+
+    if (detail === 'auto') {
+      b.group.getWorldPosition(tmpV)
+      const far = tmpV.distanceTo(state.camera.position) > (lodState.current ? LOD_DIST + 3 : LOD_DIST)
+      if (far !== lodState.current) {
+        lodState.current = far
+        b.hi.forEach((m) => (m.visible = !far))
+        b.lo.forEach((m) => (m.visible = far))
+      }
+    }
+
+    const carry = carryRef ? carryRef.current : null
+    const { wood, jar, staff: st } = b.props
+    wood.visible = carry === 'wood'
+    jar.visible = carry === 'jar'
+    st.visible = carry === 'staff'
+    b.group.getWorldQuaternion(tmpQ2)
+    const upright = (o: THREE.Object3D, tilt = 0) => {
+      ;(o.parent as THREE.Object3D).getWorldQuaternion(tmpQ)
+      o.quaternion.copy(tmpQ.invert().multiply(tmpQ2))
+      if (tilt) o.rotateX(tilt)
+    }
+    if (wood.visible) {
+      // 抱在胸前；舉起時往上往前
+      const reach = action === 'reach' ? 1 : 0
+      const k = 1 - Math.exp(-dt * 4)
+      wood.position.lerp(tmpV.set(0, reach ? 0.36 : -0.2, reach ? 0.5 : 0.26), k)
+      upright(wood)
+    }
+    if (jar.visible) {
+      jar.position.set(0, 0.18, 0.0)
+      upright(jar)
+    }
+    if (st.visible) {
+      st.position.set(0, -0.075, 0.015)
+      upright(st, 0.06)
+    }
   })
 
-  return (
-    <group>
-      {/* 腳（涼鞋） */}
-      <mesh ref={legL} position={[-0.09, 0.04, 0]}>
-        <boxGeometry args={[0.09, 0.08, 0.22]} />
-        <meshStandardMaterial color="#5a3b22" />
-      </mesh>
-      <mesh ref={legR} position={[0.09, 0.04, 0]}>
-        <boxGeometry args={[0.09, 0.08, 0.22]} />
-        <meshStandardMaterial color="#5a3b22" />
-      </mesh>
-      <group ref={body}>
-        {/* 長袍 */}
-        <mesh position={[0, 0.66, 0]} castShadow>
-          <cylinderGeometry args={[0.17, 0.3, 1.12, 12]} />
-          <meshStandardMaterial color={style.robe} roughness={0.95} />
-        </mesh>
-        {/* 腰帶 */}
-        <mesh position={[0, 0.88, 0]}>
-          <cylinderGeometry args={[0.215, 0.225, 0.08, 12]} />
-          <meshStandardMaterial color={style.sash} roughness={0.9} />
-        </mesh>
-        {/* 肩 */}
-        <mesh position={[0, 1.24, 0]} castShadow>
-          <sphereGeometry args={[0.2, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2]} />
-          <meshStandardMaterial color={style.robe} roughness={0.95} />
-        </mesh>
-        {/* 手臂 */}
-        {[
-          [armL, -0.22],
-          [armR, 0.22],
-        ].map(([ref, x], i) => (
-          <group key={i} ref={ref as MutableRefObject<THREE.Group>} position={[x as number, 1.22, 0]}>
-            <mesh position={[0, -0.27, 0]} castShadow>
-              <cylinderGeometry args={[0.06, 0.075, 0.55, 8]} />
-              <meshStandardMaterial color={style.robe} roughness={0.95} />
-            </mesh>
-            <mesh position={[0, -0.57, 0]}>
-              <sphereGeometry args={[0.045, 8, 6]} />
-              <meshStandardMaterial color={skin} />
-            </mesh>
-          </group>
-        ))}
-        {/* 頭 */}
-        <mesh position={[0, 1.44, 0]} castShadow>
-          <sphereGeometry args={[0.11, 14, 12]} />
-          <meshStandardMaterial color={skin} roughness={0.7} />
-        </mesh>
-        {style.beard && (
-          <mesh position={[0, 1.37, 0.06]}>
-            <sphereGeometry args={[0.075, 10, 8]} />
-            <meshStandardMaterial color="#2b1d14" roughness={1} />
-          </mesh>
-        )}
-        {style.turban ? (
-          <mesh position={[0, 1.54, 0]}>
-            <cylinderGeometry args={[0.11, 0.12, 0.12, 14]} />
-            <meshStandardMaterial color={style.head} roughness={0.9} />
-          </mesh>
-        ) : (
-          <>
-            <mesh position={[0, 1.49, -0.02]}>
-              <sphereGeometry args={[0.125, 14, 10, 0, Math.PI * 2, 0, Math.PI / 1.7]} />
-              <meshStandardMaterial color={style.head} roughness={0.95} side={THREE.DoubleSide} />
-            </mesh>
-            <mesh position={[0, 1.3, -0.08]}>
-              <boxGeometry args={[0.26, 0.3, 0.04]} />
-              <meshStandardMaterial color={style.head} roughness={0.95} />
-            </mesh>
-          </>
-        )}
-      </group>
-    </group>
-  )
+  return <primitive object={built.group} />
 }
-
-export const STYLES = {
-  priest: { robe: '#f1ece0', sash: '#5a2675', head: '#f4f0e6', turban: true, beard: true },
-  israelite1: { robe: '#a9875f', sash: '#7a2b22', head: '#d8cbb0', beard: true },
-  israelite2: { robe: '#6d6253', sash: '#c49a4a', head: '#8b6b45', beard: true },
-  israelite3: { robe: '#c5b49a', sash: '#2c4a7a', head: '#a24a33' },
-  woman: { robe: '#7d4a5a', sash: '#d8c08a', head: '#3d5a7a', skin: '#c08a62' },
-} satisfies Record<string, PersonStyle>
