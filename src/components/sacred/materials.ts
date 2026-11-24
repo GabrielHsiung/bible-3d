@@ -81,8 +81,8 @@ function emberGlow(repeat: [number, number], seed: number, bias = 0) {
     N,
     (i) => {
       const ridge = 1 - Math.abs(a[i] - 0.5) * 2 // 0..1，越接近 1 越在裂縫上
-      const k = sat(Math.pow(ridge, 6) * 1.6 * sat(b[i] * 1.8 - 0.35 + bias))
-      return [k, k * 0.38, k * 0.08]
+      const k = sat(Math.pow(ridge, 10) * 1.8 * sat(b[i] * 1.8 - 0.35 + bias))
+      return [k, k * 0.62, k * 0.26]
     },
     true,
     repeat,
@@ -96,9 +96,9 @@ function charMap(repeat: [number, number], seed: number) {
   return tex(
     N,
     (i) => {
-      const ash = sat((b[i] - 0.55) * 4) * 0.55
-      const v = 0.05 + a[i] * 0.07
-      return [v + ash * 0.55, v + ash * 0.52, v + ash * 0.48]
+      const ash = sat((b[i] - 0.6) * 4) * 0.3
+      const v = 0.025 + a[i] * 0.045
+      return [v + ash * 0.5, v + ash * 0.47, v + ash * 0.43]
     },
     true,
     repeat,
@@ -174,7 +174,7 @@ export const sacredMat = {
     ...woodMaps([1, 2]),
     color: '#5a4436',
     roughness: 1,
-    emissive: '#ff6a20',
+    emissive: '#ff9a40',
     emissiveMap: emberGlow([1, 2], 201, -0.1),
     emissiveIntensity: 2.2,
   }),
@@ -182,18 +182,18 @@ export const sacredMat = {
   coals: new THREE.MeshStandardMaterial({
     map: charMap([2, 2], 211),
     roughness: 1,
-    emissive: '#ff5a10',
+    emissive: '#ff9a40',
     emissiveMap: emberGlow([2, 2], 213, 0.15),
-    emissiveIntensity: 3.2,
+    emissiveIntensity: 2.4,
   }),
   /** 香壇上的小炭火 */
   incenseCoals: interior(
     new THREE.MeshStandardMaterial({
       map: charMap([1, 1], 221),
       roughness: 1,
-      emissive: '#ff5a10',
+      emissive: '#ff9a40',
       emissiveMap: emberGlow([1, 1], 223, 0.25),
-      emissiveIntensity: 2.5,
+      emissiveIntensity: 1.4,
     }),
   ),
   wick: interior(new THREE.MeshStandardMaterial({ color: '#2a1d14', roughness: 1 })),
